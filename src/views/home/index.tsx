@@ -11,6 +11,7 @@ import pkg from '../../../package.json';
 
 // Store
 import useUserSOLBalanceStore from '../../stores/useUserSOLBalanceStore';
+import { TestSolflare } from 'components/TestSolflare';
 
 export const HomeView: FC = ({ }) => {
   const wallet = useWallet();
@@ -44,6 +45,7 @@ export const HomeView: FC = ({ }) => {
         </div>
         <div>
           <RequestAirdrop />
+          <TestSolflare />
           
         </div>
         <div className="text-center">
