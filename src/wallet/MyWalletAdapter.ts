@@ -1,83 +1,44 @@
 import {
     BaseMessageSignerWalletAdapter,
-    EventEmitter,
-    scopePollingDetectionStrategy,
-    SendTransactionOptions,
-    WalletAccountError,
+    WalletAdapterNetwork,
     WalletConnectionError,
     WalletDisconnectedError,
     WalletDisconnectionError,
-    WalletError,
     WalletName,
     WalletNotConnectedError,
     WalletNotReadyError,
     WalletPublicKeyError,
     WalletReadyState,
     WalletSignTransactionError,
-    WalletWindowClosedError,
 } from '@solana/wallet-adapter-base';
-import { Connection, PublicKey, SendOptions, Transaction, TransactionSignature } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import MyWallet from './MyWallet';
 
-interface MyWalletEvents {
-    connect(...args: unknown[]): unknown;
-    disconnect(...args: unknown[]): unknown;
+export interface MyWalletAdapterConfig {
+    network?: WalletAdapterNetwork;
 }
-
-interface MyWallet extends EventEmitter<MyWalletEvents> {
-    isPhantom?: boolean;
-    publicKey?: { toBytes(): Uint8Array };
-    isConnected: boolean;
-    signTransaction(transaction: Transaction): Promise<Transaction>;
-    signAllTransactions(transactions: Transaction[]): Promise<Transaction[]>;
-    signAndSendTransaction(
-        transaction: Transaction,
-        options?: SendOptions
-    ): Promise<{ signature: TransactionSignature }>;
-    signMessage(message: Uint8Array): Promise<{ signature: Uint8Array }>;
-    connect(): Promise<void>;
-    disconnect(): Promise<void>;
-    _handleDisconnect(...args: unknown[]): unknown;
-}
-
-interface MyWindow extends Window {
-    solana?: MyWallet;
-}
-
-declare const window: MyWindow;
-
-export interface MyWalletAdapterConfig {}
 
 export const MyWalletName = 'My Wallet' as WalletName;
 
 export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
     name = MyWalletName;
-    url = 'https://phantom.app';
+    url = 'https://solflare.com';
     icon =
         'data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIiB4bWxuczpjYz0iaHR0cDovL2NyZWF0aXZlY29tbW9ucy5vcmcvbnMjIiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDQ3LjUgNDcuNSIgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgNDcuNSA0Ny41OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgdmVyc2lvbj0iMS4xIiBpZD0ic3ZnMiI+PGRlZnMgaWQ9ImRlZnM2Ij48Y2xpcFBhdGggaWQ9ImNsaXBQYXRoMTYiIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBpZD0icGF0aDE4IiBkPSJNIDAsMzggMzgsMzggMzgsMCAwLDAgMCwzOCBaIi8+PC9jbGlwUGF0aD48L2RlZnM+PGcgdHJhbnNmb3JtPSJtYXRyaXgoMS4yNSwwLDAsLTEuMjUsMCw0Ny41KSIgaWQ9ImcxMCI+PGcgaWQ9ImcxMiI+PGcgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMTYpIiBpZD0iZzE0Ij48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzNyw1KSIgaWQ9ImcyMCI+PHBhdGggaWQ9InBhdGgyMiIgc3R5bGU9ImZpbGw6IzNiODhjMztmaWxsLW9wYWNpdHk6MTtmaWxsLXJ1bGU6bm9uemVybztzdHJva2U6bm9uZSIgZD0ibSAwLDAgYyAwLC0yLjIwOSAtMS43OTEsLTQgLTQsLTQgbCAtMjgsMCBjIC0yLjIwOSwwIC00LDEuNzkxIC00LDQgbCAwLDI4IGMgMCwyLjIwOSAxLjc5MSw0IDQsNCBsIDI4LDAgYyAyLjIwOSwwIDQsLTEuNzkxIDQsLTQgTCAwLDAgWiIvPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyNC4wODc5LDE1LjA2OTMpIiBpZD0iZzI0Ij48cGF0aCBpZD0icGF0aDI2IiBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO2ZpbGwtcnVsZTpub256ZXJvO3N0cm9rZTpub25lIiBkPSJtIDAsMCBjIDAuNTI2LDEuMTc5IDAuNzQ0LDIuNTQyIDAuNzQ0LDMuOTY5IDAsMy42ODkgLTEuOTU0LDcuMTMxIC01LjgyOSw3LjEzMSAtMy44NzYsMCAtNS44MywtMy4zNzkgLTUuODMsLTcuMTMxIDAsLTMuNzgyIDEuODkyLC03LjEzMiA1LjgzLC03LjEzMiAwLjcxMiwwIDEuMzY0LDAuMDk0IDEuOTgzLDAuMjE4IGwgLTEuMTE1LDEuMDg1IGMgLTAuMzQyLDAuMzEgLTAuNTksMC44MDYgLTAuNTksMS4yNCAwLDEuMjA5IDAuODM4LDIuMjMyIDIuMTA5LDIuMjMyIDAuNDM0LDAgMC44MDUsLTAuMTU1IDEuMTc4LC0wLjQwMyBMIDAsMCBaIG0gMC4zNzEsLTYuMDc3IGMgLTEuNTE5LC0wLjg2OCAtMy4zNDgsLTEuMzY0IC01LjQ1NiwtMS4zNjQgLTYuMjk1LDAgLTEwLjY2Niw0Ljk5MiAtMTAuNjY2LDExLjQxIDAsNi40NDkgNC4zNCwxMS40MSAxMC42NjYsMTEuNDEgNi4yMzEsMCAxMC42NjUsLTUuMTE2IDEwLjY2NSwtMTEuNDEgMCwtMi43MjkgLTAuNzEzLC01LjIwOSAtMi4wNzgsLTcuMTYyIGwgMS43NjgsLTEuNTIgYyAwLjU4OSwtMC41MjcgMS4wODUsLTEuMDIzIDEuMDg1LC0xLjg5MSAwLC0xLjA4NSAtMS4wODUsLTEuOTU0IC0yLjEzOCwtMS45NTQgLTAuNjg0LDAgLTEuMjQsMC4yOCAtMi4wNzgsMC45OTMgbCAtMS43NjgsMS40ODggeiIvPjwvZz48L2c+PC9nPjwvZz4KCQoJPG1ldGFkYXRhPgoJCTxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyIgeG1sbnM6cmRmcz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC8wMS9yZGYtc2NoZW1hIyIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIj4KCQkJPHJkZjpEZXNjcmlwdGlvbiBhYm91dD0iaHR0cHM6Ly9pY29uc2NvdXQuY29tL2xlZ2FsI2xpY2Vuc2VzIiBkYzp0aXRsZT0iUSwgQ2hhcmFjdGVycywgQ2hhcmFjdGVyLCBBbHBoYWJldCwgTGV0dGVyIiBkYzpkZXNjcmlwdGlvbj0iUSwgQ2hhcmFjdGVycywgQ2hhcmFjdGVyLCBBbHBoYWJldCwgTGV0dGVyIiBkYzpwdWJsaXNoZXI9Ikljb25zY291dCIgZGM6ZGF0ZT0iMjAxNi0xMi0xNCIgZGM6Zm9ybWF0PSJpbWFnZS9zdmcreG1sIiBkYzpsYW5ndWFnZT0iZW4iPgoJCQkJPGRjOmNyZWF0b3I+CgkJCQkJPHJkZjpCYWc+CgkJCQkJCTxyZGY6bGk+VHdpdHRlciBFbW9qaTwvcmRmOmxpPgoJCQkJCTwvcmRmOkJhZz4KCQkJCTwvZGM6Y3JlYXRvcj4KCQkJPC9yZGY6RGVzY3JpcHRpb24+CgkJPC9yZGY6UkRGPgogICAgPC9tZXRhZGF0YT48L3N2Zz4K';
 
     private _connecting: boolean;
     private _wallet: MyWallet | null;
     private _publicKey: PublicKey | null;
+    private _config: MyWalletAdapterConfig;
     private _readyState: WalletReadyState =
-        typeof window === 'undefined' || typeof document === 'undefined'
-            ? WalletReadyState.Unsupported
-            : WalletReadyState.NotDetected;
+        typeof window === 'undefined' ? WalletReadyState.Unsupported : WalletReadyState.Loadable;
 
     constructor(config: MyWalletAdapterConfig = {}) {
         super();
         this._connecting = false;
-        this._wallet = null;
         this._publicKey = null;
-        if (this._readyState !== WalletReadyState.Unsupported) {
-            scopePollingDetectionStrategy(() => {
-                if (window.solana?.isPhantom) {
-                    this._readyState = WalletReadyState.Installed;
-                    this.emit('readyStateChange', this._readyState);
-                    return true;
-                }
-                return false;
-            });
-        }
+        this._wallet = null;
+        this._config = config;
     }
 
     get publicKey(): PublicKey | null {
@@ -89,7 +50,7 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
     }
 
     get connected(): boolean {
-        return !!this._wallet?.isConnected;
+        return !!this._wallet?.connected;
     }
 
     get readyState(): WalletReadyState {
@@ -97,48 +58,27 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
     }
 
     async connect(): Promise<void> {
-        console.log("connnect start");
         try {
             if (this.connected || this.connecting) return;
-            if (this._readyState !== WalletReadyState.Installed) throw new WalletNotReadyError();
+            if (this._readyState !== WalletReadyState.Loadable) throw new WalletNotReadyError();
+
+            if (!this._wallet) {
+                this._wallet = new MyWallet({ network: this._config.network });
+            }
 
             this._connecting = true;
 
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const wallet = window!.solana!;
-            console.log({wallet});
-            if (!wallet.isConnected) {
-                // HACK: Phantom doesn't reject or emit an event if the popup is closed
-                const handleDisconnect = wallet._handleDisconnect;
+            const wallet = this._wallet;
+
+            if (!wallet.connected) {
                 try {
-                    await new Promise<void>((resolve, reject) => {
-                        const connect = () => {
-                            wallet.off('connect', connect);
-                            resolve();
-                        };
-
-                        wallet._handleDisconnect = (...args: unknown[]) => {
-                            wallet.off('connect', connect);
-                            reject(new WalletWindowClosedError());
-                            return handleDisconnect.apply(wallet, args);
-                        };
-
-                        wallet.on('connect', connect);
-
-                        wallet.connect().catch((reason: any) => {
-                            wallet.off('connect', connect);
-                            reject(reason);
-                        });
-                    });
+                    await wallet.connect();
                 } catch (error: any) {
-                    if (error instanceof WalletError) throw error;
                     throw new WalletConnectionError(error?.message, error);
-                } finally {
-                    wallet._handleDisconnect = handleDisconnect;
                 }
             }
 
-            if (!wallet.publicKey) throw new WalletAccountError();
+            if (!wallet.publicKey) throw new WalletConnectionError();
 
             let publicKey: PublicKey;
             try {
@@ -166,7 +106,6 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
         if (wallet) {
             wallet.off('disconnect', this._disconnected);
 
-            this._wallet = null;
             this._publicKey = null;
 
             try {
@@ -177,31 +116,6 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
         }
 
         this.emit('disconnect');
-    }
-
-    async sendTransaction(
-        transaction: Transaction,
-        connection: Connection,
-        options?: SendTransactionOptions
-    ): Promise<TransactionSignature> {
-        try {
-            const wallet = this._wallet;
-            // Phantom doesn't handle partial signers, so if they are provided, don't use `signAndSendTransaction`
-            if (wallet && 'signAndSendTransaction' in wallet && !options?.signers) {
-                // HACK: Phantom's `signAndSendTransaction` should always set these, but doesn't yet
-                transaction.feePayer = transaction.feePayer || this.publicKey || undefined;
-                transaction.recentBlockhash =
-                    transaction.recentBlockhash || (await connection.getRecentBlockhash('finalized')).blockhash;
-
-                const { signature } = await wallet.signAndSendTransaction(transaction, options);
-                return signature;
-            }
-        } catch (error: any) {
-            this.emit('error', error);
-            throw error;
-        }
-
-        return await super.sendTransaction(transaction, connection, options);
     }
 
     async signTransaction(transaction: Transaction): Promise<Transaction> {
@@ -242,8 +156,7 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
             if (!wallet) throw new WalletNotConnectedError();
 
             try {
-                const { signature } = await wallet.signMessage(message);
-                return signature;
+                return await wallet.signMessage(message, 'utf8');
             } catch (error: any) {
                 throw new WalletSignTransactionError(error?.message, error);
             }
@@ -258,7 +171,6 @@ export class MyWalletAdapter extends BaseMessageSignerWalletAdapter {
         if (wallet) {
             wallet.off('disconnect', this._disconnected);
 
-            this._wallet = null;
             this._publicKey = null;
 
             this.emit('error', new WalletDisconnectedError());
