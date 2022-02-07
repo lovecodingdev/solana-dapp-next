@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import Link from "next/link";
 
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from '../packages/ui/react-ui/src';
 import { useAutoConnect } from '../contexts/AutoConnectProvider';
 
 export const AppBar: FC = props => {
