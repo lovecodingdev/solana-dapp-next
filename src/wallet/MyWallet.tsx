@@ -2,6 +2,11 @@ import { Cluster, clusterApiUrl, Transaction, PublicKey, Keypair, sendAndConfirm
 import EventEmitter from 'eventemitter3';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
+import ReactDOM from "react-dom";
+import renderHTML from 'react-render-html';
+
+import { confirmAlert } from 'react-confirm-alert'; // Import
+import 'react-confirm-alert/src/react-confirm-alert.css'; // Import css
 
 abstract class MyWalletAdapter extends EventEmitter {
   abstract get publicKey (): PublicKey | null;
@@ -81,10 +86,56 @@ export default class MyWallet extends EventEmitter {
     if (!this.connected) {
       throw new Error('Wallet not connected');
     }
-    let transactionBuffer = transaction.serializeMessage();
-    let signature = bs58.encode(nacl.sign.detached(transactionBuffer, this._wallet.secretKey));
-    transaction.addSignature(this.publicKey, bs58.decode(signature));
-    return transaction;
+    console.log("transaction", transaction)
+    const myPromise = new Promise<Transaction>((resolve, reject) => {
+      confirmAlert({
+        customUI: ({ onClose }) => {
+          return (
+            <div style={{border: "1px solid black", padding: "20px", backgroundColor: "black"}}>
+              <h1>Are you sure?</h1>
+              <button style={{ border: "1px solid", padding: "5px" }} onClick = {() => {reject(new Error('Cancelled')); onClose()}}>Cancel</button>
+              <button style={{ border: "1px solid", padding: "5px", marginLeft: "10px" }}
+                onClick={() => {
+                  let transactionBuffer = transaction.serializeMessage();
+                  let signature = bs58.encode(nacl.sign.detached(transactionBuffer, this._wallet.secretKey));
+                  console.log("transactionBuffer", transactionBuffer)
+                  console.log("signature", signature)
+                  transaction.addSignature(this.publicKey, bs58.decode(signature));
+                  resolve(transaction);
+                  onClose()}}
+              >
+                Approve
+              </button>
+            </div>
+          );
+        }
+      });
+    });
+
+ 
+    // const myPromise = new Promise<Transaction>((resolve, reject) => {
+    //   confirmAlert({
+    //     title: 'Confirm to submit',
+    //     message: 'Are you sure to do this.',
+    //     buttons: [
+    //       {
+    //         label: 'Yes',
+    //         onClick: () => {
+    //           let transactionBuffer = transaction.serializeMessage();
+    //           let signature = bs58.encode(nacl.sign.detached(transactionBuffer, this._wallet.secretKey));
+    //           transaction.addSignature(this.publicKey, bs58.decode(signature));
+    //           resolve(transaction);
+    //         }
+    //       },
+    //       {
+    //         label: 'No',
+    //         onClick: () => reject(new Error('Cancelled'))
+    //       }
+    //     ]
+    //   });
+    // });
+
+    return myPromise;
   }
 
   async signAllTransactions (transactions: Transaction[]): Promise<Transaction[]> {

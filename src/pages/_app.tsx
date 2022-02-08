@@ -21,6 +21,7 @@ const App: FC<AppProps> = ({ Component, pageProps }) => {
             <div className="flex flex-col h-screen">
               <Notifications />
               <AppBar/>
+              <div id="modal-root"></div>
               <ContentContainer>
                 <Component {...pageProps} />
               </ContentContainer>
