@@ -23,8 +23,9 @@ export const SendTransaction: FC = () => {
                     lamports: 1,
                 })
             );
-
+            console.log("before")
             signature = await sendTransaction(transaction, connection);
+            console.log("after");
             await connection.confirmTransaction(signature, 'confirmed');
             notify({ type: 'success', message: 'Transaction successful!', txid: signature });
         } catch (error: any) {
